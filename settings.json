@@ -1,40 +1,680 @@
 {
-    "loop_sequence": [
-        {
-            "type": "hold_rt"
-        },
-        {
-            "type": "press",
-            "button": "A",
-            "hold": 0.1
-        },
-        {
-            "type": "wait",
-            "seconds": 30.0
-        },
-        {
-            "type": "press",
-            "button": "X",
-            "hold": 0.1
-        },
-        {
-            "type": "wait",
-            "seconds": 0.2
-        },
-        {
-            "type": "press",
-            "button": "A",
-            "hold": 0.1
-        },
-        {
-            "type": "wait",
-            "seconds": 7.0
-        },
-        {
-            "type": "press",
-            "button": "A",
-            "hold": 0.1
-        }
-    ],
-    "show_background": false
+    "active_preset": "Autobuy Car",
+    "presets": {
+        "Custom Loop": [
+            {
+                "type": "hold_rt"
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 30.0
+            },
+            {
+                "type": "press",
+                "button": "X",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.2
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 7.0
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            }
+        ],
+        "Freeplay Start": [
+            {
+                "type": "press",
+                "button": "START",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "RB",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "RB",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "RB",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "RB",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "BACK",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "DPAD_UP",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 2.0
+            },
+            {
+                "type": "type_text",
+                "text": "409 742 297"
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 2.0
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 5.0
+            },
+            {
+                "type": "press",
+                "button": "Y",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "B",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 2.0
+            },
+            {
+                "type": "find_and_select_text",
+                "text": "Subaru"
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 10.0
+            }
+        ],
+        "Autobuy Car": [
+            {
+                "type": "press",
+                "button": "START",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "press",
+                "button": "DPAD_LEFT",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.1
+            },
+            {
+                "type": "press",
+                "button": "DPAD_RIGHT",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "press",
+                "button": "DPAD_RIGHT",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "press",
+                "button": "DPAD_DOWN",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 2.0
+            },
+            {
+                "type": "press",
+                "button": "BACK",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "DPAD_UP",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.2
+            },
+            {
+                "type": "press",
+                "button": "DPAD_UP",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.2
+            },
+            {
+                "type": "press",
+                "button": "DPAD_UP",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.2
+            },
+            {
+                "type": "press",
+                "button": "DPAD_RIGHT",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.2
+            },
+            {
+                "type": "press",
+                "button": "DPAD_RIGHT",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.2
+            },
+            {
+                "type": "press",
+                "button": "DPAD_RIGHT",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.2
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "DPAD_DOWN",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "BACK",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "DPAD_DOWN",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1,
+                "count": 1
+            },
+            {
+                "type": "wait",
+                "seconds": 5.0
+            }
+        ],
+        "Car Mastery Farm": [
+            {
+                "type": "find_and_select_text",
+                "text": "NEW"
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 5.0
+            },
+            {
+                "type": "press",
+                "button": "B",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "RB",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "RB",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "DPAD_DOWN",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "DPAD_RIGHT",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 3.0
+            },
+            {
+                "type": "press",
+                "button": "DPAD_UP",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 3.0
+            },
+            {
+                "type": "press",
+                "button": "DPAD_UP",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 3.0
+            },
+            {
+                "type": "press",
+                "button": "DPAD_UP",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 3.0
+            },
+            {
+                "type": "press",
+                "button": "DPAD_LEFT",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 3.0
+            },
+            {
+                "type": "press",
+                "button": "B",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "B",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 2.0
+            },
+            {
+                "type": "press",
+                "button": "DPAD_UP",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 2.0
+            }
+        ],
+        "Auction Sell": [
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 5.0
+            },
+            {
+                "type": "press",
+                "button": "LB",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "DPAD_DOWN",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 2.0
+            },
+            {
+                "type": "press",
+                "button": "DPAD_DOWN",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 0.5
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 2.0
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 1.0
+            },
+            {
+                "type": "press",
+                "button": "A",
+                "hold": 0.1
+            },
+            {
+                "type": "wait",
+                "seconds": 5.0
+            }
+        ]
+    },
+    "show_background": true
 }

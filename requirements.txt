@@ -1,0 +1,8 @@
+vgamepad
+PyQt5
+opencv-python
+mss
+easyocr
+pyautogui
+xinput-python
+pywin32

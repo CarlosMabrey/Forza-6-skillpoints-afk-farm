@@ -3,25 +3,753 @@ import threading
 import sys
 import json
 import os
-import vgamepad as vg
+import argparse
+import cv2
+import numpy as np
+import mss
+import win32gui
+import win32con
+import win32ui
 from PyQt5.QtWidgets import (QApplication, QWidget, QDialog, QVBoxLayout, QHBoxLayout, 
                              QPushButton, QTableWidget, QTableWidgetItem, QComboBox, 
-                             QDoubleSpinBox, QCheckBox, QLabel, QHeaderView, QAbstractItemView)
-from PyQt5.QtCore import Qt, QTimer, QPoint, QRect
-from PyQt5.QtGui import QPainter, QColor, QPen, QFont, QBrush, QFontMetrics, QRadialGradient, QLinearGradient, QPainterPath
+                             QDoubleSpinBox, QCheckBox, QLabel, QHeaderView, QAbstractItemView, QMessageBox, QLineEdit)
+from PyQt5.QtCore import Qt, QTimer, QPoint, QRect, pyqtSignal, QObject
+from PyQt5.QtGui import QPainter, QColor, QPen, QFont, QBrush, QFontMetrics, QRadialGradient, QLinearGradient, QPainterPath, QImage, QPixmap
+import vgamepad as vg
+import ctypes
+from ctypes import wintypes
+try:
+    from windows_capture import WindowsCapture, Frame, InternalCaptureControl
+except ImportError:
+    WindowsCapture = None
+
+def is_window_cloaked(hwnd):
+    try:
+        # DWMWA_CLOAKED = 14
+        cloaked = ctypes.c_int(0)
+        ctypes.windll.dwmapi.DwmGetWindowAttribute(
+            hwnd, 14, ctypes.byref(cloaked), ctypes.sizeof(cloaked)
+        )
+        return bool(cloaked.value)
+    except Exception:
+        return False
+
+def get_window_rect_correct(hwnd):
+    try:
+        rect = wintypes.RECT()
+        # DWMWA_EXTENDED_FRAME_BOUNDS = 9
+        ctypes.windll.dwmapi.DwmGetWindowAttribute(
+            hwnd, 9, ctypes.byref(rect), ctypes.sizeof(rect)
+        )
+        return (rect.left, rect.top, rect.right, rect.bottom)
+    except Exception:
+        return win32gui.GetWindowRect(hwnd)
+
+def get_target_window(target_title=None):
+    def callback(hwnd, hwnds):
+        title = win32gui.GetWindowText(hwnd)
+        if title:
+            hwnds.append((hwnd, title))
+        return True
+    hwnds = []
+    win32gui.EnumWindows(callback, hwnds)
+    if not hwnds:
+        return None
+    if target_title:
+        for hwnd, title in hwnds:
+            if title == target_title:
+                return hwnd
+    for hwnd, title in hwnds:
+        if "forza" in title.lower():
+            return hwnd
+    return None
+
+# Try to import OCR, but allow graceful failure
+try:
+    import easyocr
+    reader = easyocr.Reader(['en'])
+except ImportError:
+    reader = None
 
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
 
-DEFAULT_LOOP_SEQUENCE = [
-    {"type": "hold_rt"},
-    {"type": "press", "button": "A", "hold": 0.1},
-    {"type": "wait",  "seconds": 30.0},
-    {"type": "press", "button": "X", "hold": 0.1},
-    {"type": "wait",  "seconds": 0.2},
-    {"type": "press", "button": "A", "hold": 0.1},
-    {"type": "wait",  "seconds": 7.0},
-    {"type": "press", "button": "A", "hold": 0.1},
-]
+DEFAULT_PRESETS = {
+    "Custom Loop": [
+        {
+            "type": "hold_rt"
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 30.0
+        },
+        {
+            "type": "press",
+            "button": "X",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.2
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 7.0
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        }
+    ],
+    "Freeplay Start": [
+        {
+            "type": "press",
+            "button": "START",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "RB",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "RB",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "RB",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "RB",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "BACK",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "DPAD_UP",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 2.0
+        },
+        {
+            "type": "type_text",
+            "text": "409 742 297"
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 2.0
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 5.0
+        },
+        {
+            "type": "press",
+            "button": "Y",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "B",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 2.0
+        },
+        {
+            "type": "find_and_select_text",
+            "text": "Subaru"
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 10.0
+        }
+    ],
+    "Autobuy Car": [
+        {
+            "type": "press",
+            "button": "START",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "press",
+            "button": "DPAD_LEFT",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.1
+        },
+        {
+            "type": "press",
+            "button": "DPAD_RIGHT",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "press",
+            "button": "DPAD_RIGHT",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "press",
+            "button": "DPAD_DOWN",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 2.0
+        },
+        {
+            "type": "press",
+            "button": "BACK",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "DPAD_UP",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.2
+        },
+        {
+            "type": "press",
+            "button": "DPAD_UP",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.2
+        },
+        {
+            "type": "press",
+            "button": "DPAD_UP",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.2
+        },
+        {
+            "type": "press",
+            "button": "DPAD_RIGHT",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.2
+        },
+        {
+            "type": "press",
+            "button": "DPAD_RIGHT",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.2
+        },
+        {
+            "type": "press",
+            "button": "DPAD_RIGHT",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.2
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "DPAD_DOWN",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "BACK",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "DPAD_DOWN",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1,
+            "count": 1
+        },
+        {
+            "type": "wait",
+            "seconds": 5.0
+        }
+    ],
+    "Car Mastery Farm": [
+        {
+            "type": "find_and_select_text",
+            "text": "NEW"
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 5.0
+        },
+        {
+            "type": "press",
+            "button": "B",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "RB",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "RB",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "DPAD_DOWN",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "DPAD_RIGHT",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 3.0
+        },
+        {
+            "type": "press",
+            "button": "DPAD_UP",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 3.0
+        },
+        {
+            "type": "press",
+            "button": "DPAD_UP",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 3.0
+        },
+        {
+            "type": "press",
+            "button": "DPAD_UP",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 3.0
+        },
+        {
+            "type": "press",
+            "button": "DPAD_LEFT",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 3.0
+        },
+        {
+            "type": "press",
+            "button": "B",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "B",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 2.0
+        },
+        {
+            "type": "press",
+            "button": "DPAD_UP",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 2.0
+        }
+    ],
+    "Auction Sell": [
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 5.0
+        },
+        {
+            "type": "press",
+            "button": "LB",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "DPAD_DOWN",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 2.0
+        },
+        {
+            "type": "press",
+            "button": "DPAD_DOWN",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.5
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 2.0
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 1.0
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 5.0
+        }
+    ]
+}
+
 
 BUTTON_MAP = {
     "A": vg.XUSB_BUTTON.XUSB_GAMEPAD_A,
@@ -46,16 +774,22 @@ def load_settings():
         try:
             with open(SETTINGS_FILE, "r") as f:
                 data = json.load(f)
-                return data.get("loop_sequence", DEFAULT_LOOP_SEQUENCE), data.get("show_background", True)
+                presets = data.get("presets", DEFAULT_PRESETS)
+                active = data.get("active_preset", "Custom Loop")
+                bg = data.get("show_background", True)
+                if active not in presets:
+                    active = list(presets.keys())[0]
+                return presets, active, bg
         except Exception as e:
             print("Error loading settings:", e)
-    return DEFAULT_LOOP_SEQUENCE, True
+    return DEFAULT_PRESETS.copy(), "Custom Loop", True
 
-def save_settings(loop_sequence, show_background):
+def save_settings(presets, active, show_background):
     try:
         with open(SETTINGS_FILE, "w") as f:
             json.dump({
-                "loop_sequence": loop_sequence,
+                "active_preset": active,
+                "presets": presets,
                 "show_background": show_background
             }, f, indent=4)
     except Exception as e:
@@ -63,10 +797,13 @@ def save_settings(loop_sequence, show_background):
 
 
 class SettingsDialog(QDialog):
-    def __init__(self, current_sequence, show_background, parent=None):
+    def __init__(self, presets, active_preset, show_background, overlay_state=None, parent=None):
         super().__init__(parent)
+        self.overlay_state = overlay_state
+        self.presets = presets.copy()
+        self.active_preset = active_preset
         self.setWindowTitle("Overlay Settings")
-        self.resize(500, 400)
+        self.resize(600, 500)
         self.setStyleSheet("""
             QDialog {
                 background-color: #121212;
@@ -139,14 +876,14 @@ class SettingsDialog(QDialog):
                 border-bottom: 2px solid #2d2d2d;
                 font-weight: bold;
             }
-            QComboBox {
+            QComboBox, QLineEdit {
                 background-color: #2d2d2d;
                 color: #ffffff;
                 border: 1px solid #3a3a3a;
                 border-radius: 4px;
                 padding: 4px 10px;
             }
-            QComboBox:hover {
+            QComboBox:hover, QLineEdit:hover {
                 border: 1px solid #007acc;
             }
             QComboBox::drop-down {
@@ -163,17 +900,17 @@ class SettingsDialog(QDialog):
                 selection-background-color: #007acc;
                 outline: 0px;
             }
-            QDoubleSpinBox {
+            QDoubleSpinBox, QSpinBox {
                 background-color: #2d2d2d;
                 color: #ffffff;
                 border: 1px solid #3a3a3a;
                 border-radius: 4px;
                 padding: 4px;
             }
-            QDoubleSpinBox:hover, QDoubleSpinBox:focus {
+            QDoubleSpinBox:hover, QDoubleSpinBox:focus, QSpinBox:hover, QSpinBox:focus {
                 border: 1px solid #007acc;
             }
-            QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+            QDoubleSpinBox::up-button, QDoubleSpinBox::down-button, QSpinBox::up-button, QSpinBox::down-button {
                 background-color: transparent;
                 border: none;
                 width: 16px;
@@ -205,19 +942,44 @@ class SettingsDialog(QDialog):
         self.layout = QVBoxLayout(self)
         self.layout.setSpacing(12)
         self.layout.setContentsMargins(16, 16, 16, 16)
+
+        # Preset Top Bar
+        preset_layout = QHBoxLayout()
+        preset_layout.addWidget(QLabel("Active Preset:"))
+        self.preset_combo = QComboBox()
+        self.preset_combo.addItems(self.presets.keys())
+        self.preset_combo.setCurrentText(self.active_preset)
+        self.preset_combo.currentTextChanged.connect(self.on_preset_changed)
+        preset_layout.addWidget(self.preset_combo)
         
+        btn_new_preset = QPushButton("New Preset")
+        btn_new_preset.clicked.connect(self.new_preset)
+        preset_layout.addWidget(btn_new_preset)
+        self.layout.addLayout(preset_layout)
+
         self.bg_checkbox = QCheckBox("Show Dark Background Overlay")
         self.bg_checkbox.setChecked(show_background)
         self.layout.addWidget(self.bg_checkbox)
         
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["Type", "Button", "Wait (s)", "Hold (s)"])
+        # Environment Check
+        btn_env = QPushButton("Check Environment Setup")
+        btn_env.clicked.connect(lambda: show_env_helper(self))
+        self.layout.addWidget(btn_env)
+
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(["Type", "Button", "Wait (s)", "Hold (s)", "Count", "Text (CV)"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.layout.addWidget(self.table)
         
-        for step in current_sequence:
-            self.add_row(step)
+        if self.active_preset in self.presets:
+            self.load_sequence(self.presets[self.active_preset])
+            
+        # Update timer for highlighting active test run step
+        self.update_timer = QTimer(self)
+        self.update_timer.timeout.connect(self.update_highlight)
+        self.update_timer.start(100)
             
         ctrl_layout = QHBoxLayout()
         btn_add = QPushButton("Add Step")
@@ -238,6 +1000,14 @@ class SettingsDialog(QDialog):
         btm_layout = QHBoxLayout()
         btn_restore = QPushButton("Restore Defaults")
         btn_restore.clicked.connect(self.restore_defaults)
+        
+        self.btn_record = QPushButton("Record Macro")
+        self.btn_record.setCheckable(True)
+        self.btn_record.toggled.connect(self.toggle_record)
+        
+        self.btn_test = QPushButton("Test Run")
+        self.btn_test.clicked.connect(self.test_run)
+        
         btn_save = QPushButton("Save")
         btn_save.setObjectName("btnSave")
         btn_save.clicked.connect(self.accept)
@@ -245,17 +1015,42 @@ class SettingsDialog(QDialog):
         btn_cancel.clicked.connect(self.reject)
         
         btm_layout.addWidget(btn_restore)
+        btm_layout.addWidget(self.btn_record)
+        btm_layout.addWidget(self.btn_test)
         btm_layout.addStretch()
         btm_layout.addWidget(btn_save)
         btm_layout.addWidget(btn_cancel)
         self.layout.addLayout(btm_layout)
+
+    def load_sequence(self, sequence):
+        self.table.setRowCount(0)
+        for step in sequence:
+            self.add_row(step)
+
+    def on_preset_changed(self, text):
+        if self.active_preset in self.presets:
+            self.presets[self.active_preset] = self.get_sequence()
+        self.active_preset = text
+        if text in self.presets:
+            self.load_sequence(self.presets[text])
+
+    def new_preset(self):
+        base_name = "New Preset"
+        name = base_name
+        i = 1
+        while name in self.presets:
+            name = f"{base_name} {i}"
+            i += 1
+        self.presets[name] = [{"type": "wait", "seconds": 1.0}]
+        self.preset_combo.addItem(name)
+        self.preset_combo.setCurrentText(name)
 
     def add_row(self, step):
         r = self.table.rowCount()
         self.table.insertRow(r)
         
         type_combo = QComboBox()
-        type_combo.addItems(["press", "hold_rt", "release_rt", "wait"])
+        type_combo.addItems(["press", "hold_rt", "release_rt", "wait", "wait_for_text", "find_and_select_text", "type_text"])
         type_combo.setCurrentText(step.get("type", "press"))
         self.table.setCellWidget(r, 0, type_combo)
         
@@ -276,10 +1071,28 @@ class SettingsDialog(QDialog):
         hold_spin.setValue(float(step.get("hold", 0.1)))
         self.table.setCellWidget(r, 3, hold_spin)
 
+        from PyQt5.QtWidgets import QSpinBox
+        count_spin = QSpinBox()
+        count_spin.setMinimum(1)
+        count_spin.setMaximum(9999)
+        count_spin.setValue(int(step.get("count", 1)))
+        self.table.setCellWidget(r, 4, count_spin)
+
+        text_edit = QLineEdit()
+        text_edit.setText(step.get("text", ""))
+        self.table.setCellWidget(r, 5, text_edit)
+
     def remove_row(self):
-        row = self.table.currentRow()
-        if row >= 0:
-            self.table.removeRow(row)
+        selected_indices = self.table.selectionModel().selectedRows()
+        if not selected_indices:
+            row = self.table.currentRow()
+            if row >= 0:
+                self.table.removeRow(row)
+            return
+
+        rows_to_delete = sorted([idx.row() for idx in selected_indices], reverse=True)
+        for r in rows_to_delete:
+            self.table.removeRow(r)
 
     def move_up(self):
         row = self.table.currentRow()
@@ -294,7 +1107,7 @@ class SettingsDialog(QDialog):
             self.table.selectRow(row + 1)
 
     def swap_rows(self, r1, r2):
-        for col in range(4):
+        for col in range(6):
             w1 = self.table.cellWidget(r1, col)
             w2 = self.table.cellWidget(r2, col)
             self.table.removeCellWidget(r1, col)
@@ -302,10 +1115,76 @@ class SettingsDialog(QDialog):
             self.table.setCellWidget(r1, col, w2)
             self.table.setCellWidget(r2, col, w1)
 
+    def test_run(self):
+        if not self.overlay_state:
+            return
+        with self.overlay_state.lock:
+            currently_running = self.overlay_state.running
+        if currently_running:
+            with self.overlay_state.lock:
+                self.overlay_state.running = False
+                self.overlay_state.pause_event.clear()
+        else:
+            seq = self.get_sequence()
+            with self.overlay_state.lock:
+                self.overlay_state.presets[self.overlay_state.active_preset] = seq
+                self.overlay_state.running = True
+                self.overlay_state.pause_event.set()
+
+    def toggle_record(self, checked):
+        if checked:
+            self.btn_record.setText("Stop Recording")
+            self.is_recording = True
+            self.recorded_steps = []
+            self.record_thread = threading.Thread(target=self._record_macro_loop, daemon=True)
+            self.record_thread.start()
+        else:
+            self.btn_record.setText("Record Macro")
+            self.is_recording = False
+            time.sleep(0.1)
+            for step in self.recorded_steps:
+                self.add_row(step)
+                
+    def _record_macro_loop(self):
+        try:
+            import XInput
+            last_time = time.time()
+            
+            BTN_MAP = {
+                "DPAD_UP": "DPAD_UP", "DPAD_DOWN": "DPAD_DOWN", 
+                "DPAD_LEFT": "DPAD_LEFT", "DPAD_RIGHT": "DPAD_RIGHT",
+                "A": "A", "B": "B", "X": "X", "Y": "Y",
+                "LEFT_SHOULDER": "LB", "RIGHT_SHOULDER": "RB",
+                "START": "START", "BACK": "BACK"
+            }
+            
+            while self.is_recording:
+                events = XInput.get_events()
+                for event in events:
+                    if not self.is_recording:
+                        break
+                    
+                    if event.type == XInput.EVENT_BUTTON_PRESSED:
+                        # event.button in XInput_Python returns the string representation like "DPAD_UP" or "A"
+                        # wait, earlier task-259 showed the raw _button_dict: {1: 'DPAD_UP', ...}
+                        # event.button_id is the integer, event.button is the string.
+                        btn_name = BTN_MAP.get(event.button)
+                        if btn_name:
+                            current_time = time.time()
+                            wait_time = current_time - last_time
+                            if wait_time > 0.1:
+                                self.recorded_steps.append({"type": "wait", "seconds": round(wait_time, 1)})
+                            self.recorded_steps.append({"type": "press", "button": btn_name, "hold": 0.1, "count": 1})
+                            last_time = current_time
+                time.sleep(0.01)
+        except Exception as e:
+            print("Error recording macro:", e)
+
     def restore_defaults(self):
-        self.table.setRowCount(0)
-        for step in DEFAULT_LOOP_SEQUENCE:
-            self.add_row(step)
+        self.presets = DEFAULT_PRESETS.copy()
+        self.preset_combo.clear()
+        self.preset_combo.addItems(self.presets.keys())
+        self.preset_combo.setCurrentText("Custom Loop")
         self.bg_checkbox.setChecked(True)
 
     def get_sequence(self):
@@ -316,16 +1195,54 @@ class SettingsDialog(QDialog):
             if t == "press":
                 step["button"] = self.table.cellWidget(r, 1).currentText()
                 step["hold"] = self.table.cellWidget(r, 3).value()
+                step["count"] = self.table.cellWidget(r, 4).value()
             elif t == "wait":
                 step["seconds"] = self.table.cellWidget(r, 2).value()
+            elif t in ["wait_for_text", "find_and_select_text", "type_text"]:
+                step["text"] = self.table.cellWidget(r, 5).text()
             seq.append(step)
         return seq
+
+    def update_highlight(self):
+        if not self.overlay_state:
+            return
+        with self.overlay_state.lock:
+            active_idx = self.overlay_state.current_step_idx
+            is_running = self.overlay_state.running
+        
+        if is_running:
+            self.btn_test.setText("Stop Test")
+        else:
+            self.btn_test.setText("Test Run")
+        
+        # If not running or active_idx is out of range, clear highlights
+        if not is_running or active_idx < 0 or active_idx >= self.table.rowCount():
+            for r in range(self.table.rowCount()):
+                for col in range(self.table.columnCount()):
+                    w = self.table.cellWidget(r, col)
+                    if w:
+                        w.setStyleSheet("")
+            return
+
+        # Highlight the active row and reset others
+        for r in range(self.table.rowCount()):
+            is_active = (r == active_idx)
+            for col in range(self.table.columnCount()):
+                w = self.table.cellWidget(r, col)
+                if w:
+                    if is_active:
+                        w.setStyleSheet("background-color: #1a4f76; color: #ffffff; border: 1px solid #007acc; border-radius: 4px;")
+                    else:
+                        w.setStyleSheet("")
+                        
+        # Auto-scroll to the active row
+        self.table.scrollTo(self.table.model().index(active_idx, 0))
 
 
 class OverlayState:
     _UNSET = object()
 
-    def __init__(self, loop_sequence, show_background):
+    def __init__(self, presets, active_preset, show_background):
         self.lock = threading.Lock()
         self.phase_label = ""
         self.countdown = 0
@@ -334,10 +1251,14 @@ class OverlayState:
         self.holding_rt = False
         self.running = True
         self.pause_event = threading.Event()
-        self.loop_sequence = loop_sequence
+        self.presets = presets
+        self.active_preset = active_preset
         self.show_background = show_background
+        self.latest_frame = None
+        self.target_window_title = None
+        self.current_step_idx = -1
 
-    def update(self, phase_label=_UNSET, countdown=_UNSET, active_button=_UNSET, highlight_buttons=_UNSET, holding_rt=_UNSET):
+    def update(self, phase_label=_UNSET, countdown=_UNSET, active_button=_UNSET, highlight_buttons=_UNSET, holding_rt=_UNSET, latest_frame=_UNSET, current_step_idx=_UNSET):
         with self.lock:
             if phase_label is not self._UNSET:
                 self.phase_label = phase_label
@@ -349,12 +1270,16 @@ class OverlayState:
                 self.highlight_buttons = highlight_buttons or set()
             if holding_rt is not self._UNSET:
                 self.holding_rt = holding_rt
+            if latest_frame is not self._UNSET:
+                self.latest_frame = latest_frame
+            if current_step_idx is not self._UNSET:
+                self.current_step_idx = current_step_idx
 
     def snapshot(self):
         with self.lock:
             return (self.phase_label, self.countdown, self.active_button,
                     self.highlight_buttons.copy(), self.holding_rt, self.running,
-                    self.show_background)
+                    self.show_background, self.latest_frame)
 
     def toggle_running(self):
         with self.lock:
@@ -430,21 +1355,26 @@ class XboxControllerWidget(QWidget):
             return
 
         with self.state.lock:
-            current_seq = self.state.loop_sequence.copy()
+            presets_copy = {k: [step.copy() for step in v] for k, v in self.state.presets.items()}
+            active = self.state.active_preset
             show_bg = self.state.show_background
             
-        self.settings_dialog = SettingsDialog(current_seq, show_bg)
+        self.settings_dialog = SettingsDialog(presets_copy, active, show_bg, self.state)
         self.settings_dialog.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
         self.settings_dialog.accepted.connect(self._on_settings_saved)
         self.settings_dialog.show()
 
     def _on_settings_saved(self):
-        new_seq = self.settings_dialog.get_sequence()
+        if self.settings_dialog.active_preset in self.settings_dialog.presets:
+            self.settings_dialog.presets[self.settings_dialog.active_preset] = self.settings_dialog.get_sequence()
+        new_presets = self.settings_dialog.presets
+        new_active = self.settings_dialog.active_preset
         new_bg = self.settings_dialog.bg_checkbox.isChecked()
         with self.state.lock:
-            self.state.loop_sequence = new_seq
+            self.state.presets = new_presets
+            self.state.active_preset = new_active
             self.state.show_background = new_bg
-        save_settings(new_seq, new_bg)
+        save_settings(new_presets, new_active, new_bg)
 
     def tick(self):
         self.flash = (self.flash + 0.05) % 1.0
@@ -454,7 +1384,7 @@ class XboxControllerWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        phase, countdown, active_button, highlights, holding_rt, running, show_bg = self.state.snapshot()
+        phase, countdown, active_button, highlights, holding_rt, running, show_bg, _ = self.state.snapshot()
 
         cx, cy = self.cw // 2, self.ch // 2 - 10
 
@@ -919,20 +1849,37 @@ def gamepad_loop(state):
         gamepad.release_button(button=vg_btn)
         gamepad.update()
 
-    state.pause_event.set()
-    state.update(phase_label="Starting...")
+    def find_text_on_screen(target_text):
+        if not reader:
+            return None
+        frame = state.snapshot()[7] # latest_frame
+        if frame is None:
+            return None
+        # Convert frame to something easyocr can use
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        results = reader.readtext(gray)
+        for bbox, text, prob in results:
+            if target_text.lower() in text.lower():
+                return bbox
+        return None
+
+    state.update(phase_label="Starting..." if state.running else "Paused")
+    if state.running:
+        state.pause_event.set()
 
     while True:
         state.pause_event.wait()
         if not state.running:
+            state.pause_event.clear()
             continue
 
         with state.lock:
-            current_sequence = state.loop_sequence.copy()
+            current_sequence = state.presets.get(state.active_preset, []).copy()
 
-        for phase in current_sequence:
+        for idx, phase in enumerate(current_sequence):
             if not state.running:
                 break
+            state.update(current_step_idx=idx)
 
             t = phase["type"]
             if t == "hold_rt":
@@ -961,9 +1908,58 @@ def gamepad_loop(state):
             elif t == "press":
                 btn = phase["button"]
                 hold = float(phase.get("hold", 0.1))
-                press(btn, hold)
-                state.update(active_button=None, countdown=0, highlight_buttons={"RT"} if hold_rt else set())
-                time.sleep(0.1)
+                count = int(phase.get("count", 1))
+                for _ in range(count):
+                    if not state.running:
+                        break
+                    press(btn, hold)
+                    state.update(active_button=None, countdown=0, highlight_buttons={"RT"} if hold_rt else set())
+                    time.sleep(0.1)
+            
+            elif t == "wait_for_text":
+                target = phase.get("text", "")
+                state.update(phase_label=f"Waiting for '{target}'...")
+                while state.running:
+                    if find_text_on_screen(target):
+                        break
+                    time.sleep(1.0)
+                state.update(phase_label="")
+                
+            elif t == "find_and_select_text":
+                target = phase.get("text", "")
+                state.update(phase_label=f"Finding '{target}'...")
+                bbox = None
+                for _ in range(10): # try 10 times
+                    if not state.running:
+                        break
+                    bbox = find_text_on_screen(target)
+                    if bbox:
+                        break
+                    time.sleep(1.0)
+                if bbox:
+                    # Found it. We assume simple press A to select it.
+                    press("A", 0.1)
+                state.update(phase_label="")
+                
+            elif t == "type_text":
+                target = phase.get("text", "")
+                state.update(phase_label=f"Typing '{target}'...")
+                target_title = None
+                with state.lock:
+                    target_title = state.target_window_title
+                hwnd = get_target_window(target_title)
+                if hwnd:
+                    try:
+                        import pyautogui
+                        pyautogui.press('alt') # Wake up shell
+                        win32gui.SetForegroundWindow(hwnd)
+                        time.sleep(0.5)
+                        pyautogui.write(target, interval=0.05)
+                        time.sleep(0.5)
+                        pyautogui.press('enter')
+                    except Exception as e:
+                        print("Error typing text:", e)
+                state.update(phase_label="")
 
         if hold_rt and not state.running:
             gamepad.right_trigger(value=0)
@@ -971,23 +1967,186 @@ def gamepad_loop(state):
             hold_rt = False
 
         if state.running:
-            state.update(phase_label="Restarting...", countdown=0)
+            state.update(phase_label="Restarting...", countdown=0, current_step_idx=-1)
             time.sleep(1)
             state.update(phase_label="")
         else:
-            state.update(active_button=None, highlight_buttons=set(), holding_rt=False, phase_label="Stopped", countdown=0)
+            state.update(active_button=None, highlight_buttons=set(), holding_rt=False, phase_label="Stopped", countdown=0, current_step_idx=-1)
+
+
+def wgc_capture_loop(state, window_name):
+    if not WindowsCapture:
+        return
+    
+    try:
+        capture = WindowsCapture(
+            window_name=window_name,
+            cursor_capture=False,
+            draw_border=False,
+        )
+
+        @capture.event
+        def on_frame_arrived(frame, control):
+            # Check if target window title has changed
+            with state.lock:
+                if state.target_window_title != window_name:
+                    control.stop()
+                    return
+
+            # frame.as_numpy() returns BGRA
+            img_bgra = frame.as_numpy()
+            img_bgr = cv2.cvtColor(img_bgra, cv2.COLOR_BGRA2BGR)
+            
+            # Dead frame filter: Ignore solid black or solid gray (204) frames
+            avg = np.mean(img_bgr)
+            if avg > 2 and abs(avg - 204) > 1:
+                state.update(latest_frame=img_bgr)
+
+        @capture.event
+        def on_closed():
+            print(f"[INFO] WGC Capture session closed for '{window_name}'")
+
+        capture.start()
+    except Exception as e:
+        print(f"WGC Capture Error for '{window_name}':", e)
+
+def capture_loop(state):
+    current_title = None
+    with mss.mss() as sct:
+        while True:
+            target_title = None
+            with state.lock:
+                target_title = state.target_window_title
+            
+            # If target changed and we have WGC available, start WGC session
+            if WindowsCapture and target_title and target_title != current_title:
+                current_title = target_title
+                threading.Thread(target=wgc_capture_loop, args=(state, target_title), daemon=True).start()
+            
+            # Fallback: If no window is selected, capture the primary monitor
+            if not target_title:
+                try:
+                    sct_img = sct.grab(sct.monitors[1])
+                    img = np.array(sct_img)
+                    img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+                    state.update(latest_frame=img)
+                    current_title = None # Reset so selecting a window later works
+                except Exception:
+                    pass
+            
+            # The WGC capture runs in its own thread and updates state.latest_frame.
+            # We sleep here to keep the monitoring loop alive and handle title changes.
+            time.sleep(0.5)
+
+
+class OBSPreviewWindow(QWidget):
+    def __init__(self, overlay_state):
+        super().__init__()
+        self.state = overlay_state
+        self.setWindowTitle("OBS Game Preview")
+        self.resize(640, 360)
+        self.setStyleSheet("background-color: black;")
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_frame)
+        self.timer.start(33) # 30 FPS
+        self.current_pixmap = None
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.RightButton:
+            self.show_context_menu(event.globalPos())
+
+    def show_context_menu(self, pos):
+        from PyQt5.QtWidgets import QMenu
+        menu = QMenu(self)
+        menu.setStyleSheet("QMenu { background-color: #2d2d2d; color: white; border: 1px solid #3a3a3a; padding: 4px; } QMenu::item:selected { background-color: #007acc; }")
+        
+        def callback(hwnd, hwnds):
+            if not win32gui.IsWindow(hwnd):
+                return True
+            title = win32gui.GetWindowText(hwnd)
+            if not title:
+                return True
+            
+            # Filter for visible or cloaked (virtual desktop) windows
+            # and ignore very small/empty titles or system windows
+            is_visible = win32gui.IsWindowVisible(hwnd)
+            is_cloaked = is_window_cloaked(hwnd)
+            
+            if (is_visible or is_cloaked) and len(title) > 2:
+                hwnds.append(title)
+            return True
+
+        windows = []
+        win32gui.EnumWindows(callback, windows)
+        windows = sorted(list(set(windows)))
+        
+        for w in windows:
+            if w.strip():
+                action = menu.addAction(w)
+                action.triggered.connect(lambda checked, title=w: self.set_target_window(title))
+                
+        menu.exec_(pos)
+        
+    def set_target_window(self, title):
+        with self.state.lock:
+            self.state.target_window_title = title
+
+    def update_frame(self):
+        frame = self.state.snapshot()[7]
+        if frame is not None:
+            # convert BGR to RGB
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            h, w, ch = frame_rgb.shape
+            bytes_per_line = ch * w
+            q_img = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
+            self.current_pixmap = QPixmap.fromImage(q_img)
+            self.update()
+
+    def paintEvent(self, event):
+        if self.current_pixmap:
+            painter = QPainter(self)
+            # scale pixmap to fit window while keeping aspect ratio
+            scaled_pix = self.current_pixmap.scaled(self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            x = (self.width() - scaled_pix.width()) // 2
+            y = (self.height() - scaled_pix.height()) // 2
+            painter.drawPixmap(x, y, scaled_pix)
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Forza Auto Skill Points")
+    parser.add_argument("-pause", action="store_true", help="Start paused (no script runs on init)")
+    parser.add_argument("-script", type=str, help="Run only the specified script by name")
+    parser.add_argument("-controller", type=str, choices=["on", "off"], default="on", help="Show the controller overlay (default: on)")
+    args = parser.parse_args()
+    
     app = QApplication(sys.argv)
     
-    initial_seq, initial_bg = load_settings()
-    overlay_state = OverlayState(initial_seq, initial_bg)
+    initial_presets, initial_active, initial_bg = load_settings()
     
-    widget = XboxControllerWidget(overlay_state)
-    widget.show()
+    if args.script:
+        if args.script in initial_presets:
+            initial_presets = {args.script: initial_presets[args.script]}
+            initial_active = args.script
+        else:
+            print(f"Script '{args.script}' not found. Available: {list(initial_presets.keys())}")
+            sys.exit(1)
+    
+    overlay_state = OverlayState(initial_presets, initial_active, initial_bg)
+    
+    if args.pause:
+        overlay_state.running = False
+    
+    if args.controller == "on":
+        widget = XboxControllerWidget(overlay_state)
+        widget.show()
+    
+    preview = OBSPreviewWindow(overlay_state)
+    preview.show()
 
-    t = threading.Thread(target=gamepad_loop, args=(overlay_state,), daemon=True)
-    t.start()
+    t_gamepad = threading.Thread(target=gamepad_loop, args=(overlay_state,), daemon=True)
+    t_gamepad.start()
+    
+    t_capture = threading.Thread(target=capture_loop, args=(overlay_state,), daemon=True)
+    t_capture.start()
 
     sys.exit(app.exec_())
