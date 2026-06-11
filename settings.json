@@ -1,0 +1,40 @@
+{
+    "loop_sequence": [
+        {
+            "type": "hold_rt"
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 30.0
+        },
+        {
+            "type": "press",
+            "button": "X",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 0.2
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        },
+        {
+            "type": "wait",
+            "seconds": 7.0
+        },
+        {
+            "type": "press",
+            "button": "A",
+            "hold": 0.1
+        }
+    ],
+    "show_background": false
+}
